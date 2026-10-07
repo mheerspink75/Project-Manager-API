@@ -1,7 +1,13 @@
 # Project Manager API - developer workflow
 PYTHON ?= python
 
-.PHONY: install test coverage verify-migration import-check routes-check run docker-up docker-down
+.PHONY: clean install test coverage verify-migration import-check routes-check run docker-up docker-down
+
+## Remove test/build artifacts. Run this (or `git clean -fdx --dry-run`)
+## before delivering a snapshot so no .coverage/.pytest_cache/__pycache__ ship.
+clean:
+	find . -name '__pycache__' -exec rm -rf {} + 2>/dev/null; \
+	rm -rf .pytest_cache .coverage htmlcov
 
 ## Install pinned runtime + test dependencies.
 install:
