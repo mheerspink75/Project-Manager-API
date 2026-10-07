@@ -11,6 +11,21 @@ semantics, so a small in-app implementation is used instead:
 * limit (``LOGIN_MAX_FAILED_ATTEMPTS``) configurable via settings,
 * ``429`` responses while the window is active,
 * a public ``reset()`` hook used by tests to guarantee isolation.
+
+KNOWN LIMITATIONS
+-----------------
+* The store is in-process only. Under a multi-worker deployment (Gunicorn /
+  uvicorn with N workers) each worker keeps an independent counter, so the
+  effective failed-attempt budget is multiplied by the worker count (N x
+  ``LOGIN_MAX_FAILED_ATTEMPTS``) before any single worker locks the
+  identifier out. The store also vanishes on process restart.
+* An adversary who knows a target's username can deliberately exhaust the
+  budget and lock that user out (a denial-of-service vector). Operators
+  should place the login endpoint behind an IP-rate-limiting reverse proxy
+  (e.g. nginx ``limit_req``) in addition to this in-app guard.
+* The recommended production upgrade path is a Redis-backed implementation:
+  replace the in-memory ``_failures`` dict with an atomic Redis ``INCR`` +
+  ``EXPIRE`` so all workers share one counter that survives restarts.
 """
 
 from __future__ import annotations
