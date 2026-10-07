@@ -128,6 +128,15 @@ class Settings(BaseSettings):
     LOGIN_MAX_FAILED_ATTEMPTS: int = 5
     LOGIN_LOCKOUT_WINDOW_SECONDS: int = 300
 
+    # Comma-separated list of allowed CORS origins.
+    # Example: "https://app.example.com,https://admin.example.com"
+    CORS_ORIGINS: str = "http://localhost:3000,http://127.0.0.1:3000"
+
+    @property
+    def cors_origins_list(self) -> list[str]:
+        """Parsed CORS origins: split on commas, strip whitespace, drop blanks."""
+        return [o.strip() for o in self.CORS_ORIGINS.split(",") if o.strip()]
+
     @field_validator("SECRET_KEY")
     @classmethod
     def _validate_secret_key(cls, value: str, info: ValidationInfo) -> str:
