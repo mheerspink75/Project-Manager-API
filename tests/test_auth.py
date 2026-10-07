@@ -218,6 +218,52 @@ class TestTokenHandling:
         assert client.post("/auth/logout", json=body, headers=headers).status_code == 204
         assert client.post("/auth/logout", json=body, headers=headers).status_code == 204
 
+    def test_revocation_row_has_expires_at(self, client, session, regular_user):
+        from sqlalchemy import select
+
+        from app.models.token_revocation import TokenRevocation
+
+        tokens = api_login(client, "alice").json()
+        headers = {"Authorization": f"Bearer {tokens['access_token']}"}
+        resp = client.post(
+            "/auth/logout", json={"refresh_token": tokens["refresh_token"]}, headers=headers
+        )
+        assert resp.status_code == 204
+
+        row = session.execute(select(TokenRevocation)).scalars().first()
+        assert row is not None
+        assert row.expires_at is not None
+        # SQLite returns naive datetimes; the stored value is UTC, so attach
+        # UTC tzinfo before comparing against an aware "now".
+        assert row.expires_at.replace(tzinfo=timezone.utc) > datetime.now(tz=timezone.utc)
+
+    def test_logout_with_foreign_refresh_token_403(
+        self, client, session, regular_user, other_user
+    ):
+        from sqlalchemy import select
+
+        from app.core.security import create_refresh_token, decode_token
+        from app.models.token_revocation import TokenRevocation
+
+        # Log in as alice to get her access token.
+        tokens = api_login(client, "alice").json()
+        headers = {"Authorization": f"Bearer {tokens['access_token']}"}
+
+        # Create a refresh token belonging to bob (a different user).
+        foreign_refresh = create_refresh_token(other_user.id, other_user.email)
+
+        resp = client.post(
+            "/auth/logout", json={"refresh_token": foreign_refresh}, headers=headers
+        )
+        assert resp.status_code == 403
+
+        # The foreign refresh token must NOT have been revoked.
+        jti = decode_token(foreign_refresh, expected_type="refresh")["jti"]
+        revoked = session.execute(
+            select(TokenRevocation).where(TokenRevocation.jti == jti)
+        ).scalars().first()
+        assert revoked is None
+
     def test_logout_with_invalid_refresh_token_401(self, client, regular_user):
         tokens = api_login(client, "alice").json()
         headers = {"Authorization": f"Bearer {tokens['access_token']}"}
