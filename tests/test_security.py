@@ -69,6 +69,23 @@ class TestSecretKeyPolicy:
         assert ok.SECRET_KEY == "change" + "-me"
 
 
+class TestCorsConfig:
+    def test_cors_origins_parsed_correctly(self):
+        from app.core.config import Settings
+
+        s = Settings(
+            ENVIRONMENT="development",
+            CORS_ORIGINS="https://a.example.com, https://b.example.com",
+        )
+        assert s.cors_origins_list == ["https://a.example.com", "https://b.example.com"]
+
+    def test_cors_origins_default(self):
+        from app.core.config import Settings
+
+        s = Settings(ENVIRONMENT="development")
+        assert s.cors_origins_list == ["http://localhost:3000", "http://127.0.0.1:3000"]
+
+
 class TestPasswordPolicy:
     def test_short_password_rejected(self):
         with pytest.raises(ValueError, match="8 characters"):
