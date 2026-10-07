@@ -1,0 +1,46 @@
+# Keep the image and build context small; exclude everything that is not
+# needed to build and run the application image.
+
+# VCS & local metadata
+.git
+.gitignore
+.idea
+.vscode
+*.swp
+.DS_Store
+
+# Python artifacts
+__pycache__
+*.py[cod]
+*.egg-info
+.eggs
+build
+dist
+.venv
+venv
+env
+ENV
+
+# Tests & tooling (not needed in the runtime image)
+tests
+.pytest_cache
+.coverage
+coverage.xml
+htmlcov
+.mypy_cache
+.ruff_cache
+
+# Local databases & secrets
+*.db
+*.sqlite
+*.sqlite3
+project_manager.db
+.env
+.env.*
+!.env.example
+
+# Docs & project meta (not needed to build the image)
+README.md
+Makefile
+docker-compose.yml
+scripts

@@ -1,0 +1,64 @@
+# ---- Python ----
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+*.egg
+MANIFEST
+
+# ---- Virtual environments ----
+.venv/
+venv/
+env/
+ENV/
+
+# ---- Testing / coverage artifacts (must never be delivered) ----
+.pytest_cache/
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+.tox/
+.nox/
+cache/
+nosetests.xml
+
+# ---- Databases (local dev/test only; never committed) ----
+*.db
+*.sqlite
+*.sqlite3
+project_manager.db
+
+# ---- Secrets / local env ----
+.env
+.env.*
+!.env.example
+
+# ---- Alembic scratch ----
+alembic/versions/__pycache__/
+
+# ---- Tooling / editor ----
+.mypy_cache/
+.ruff_cache/
+.pytype/
+.idea/
+.vscode/
+*.swp
+.DS_Store
+
+# ---- OS ----
+Thumbs.db

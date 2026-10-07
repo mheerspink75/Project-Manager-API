@@ -1,0 +1,67 @@
+# Project Manager API - Docker Compose stack.
+#
+# Postgres is the default database (its own service in this file); SQLite is
+# reserved for local development and tests.
+#
+# Secrets are NEVER embedded here:
+#   * SECRET_KEY      - required from the environment/.env (compose aborts
+#                       with a clear message if it is unset);
+#   * POSTGRES_PASSWORD - required from the environment/.env.
+#
+#   cp .env.example .env   # then fill in real values before `docker compose up`
+name: project-manager
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-pm_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required - set it in .env or the environment}
+      POSTGRES_DB: ${POSTGRES_DB:-project_manager}
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - pg_isready -U ${POSTGRES_USER:-pm_user} -d ${POSTGRES_DB:-project_manager}
+      interval: 5s
+      timeout: 5s
+      retries: 12
+    # Port is not exposed to the host by default; uncomment to debug:
+    # ports:
+    #   - "5432:5432"
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      ENVIRONMENT: production
+      # REQUIRED - supplied via .env or the environment; compose fails fast
+      # with a clear message when it is missing (no fallback secret exists).
+      SECRET_KEY: ${SECRET_KEY:?SECRET_KEY is required - set a strong random secret in .env (e.g. openssl rand -hex 32)}
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-pm_user}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-project_manager}
+      ENGINE_POOL_SIZE: "10"
+      ENGINE_MAX_OVERFLOW: "20"
+      LOGIN_MAX_FAILED_ATTEMPTS: "5"
+      LOGIN_LOCKOUT_WINDOW_SECONDS: "300"
+    ports:
+      - "8000:8000"
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=4)
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
+volumes:
+  db_data:
