@@ -217,3 +217,28 @@ class TestAuditProjectMutations:
             select(AuditLog).order_by(AuditLog.id.desc())
         ).scalars().first()
         assert row.created_at is not None  # "when" is recorded
+
+
+class TestTokenRevocationPurge:
+    def test_purge_expired_revocations(self, session, regular_user):
+        from datetime import datetime, timedelta, timezone
+
+        from app.core.audit import purge_expired_revocations
+        from app.models.token_revocation import TokenRevocation
+
+        # A revocation row whose underlying refresh token has already expired.
+        expired = TokenRevocation(
+            jti="purge-test-expired",
+            user_id=regular_user.id,
+            expires_at=datetime.now(timezone.utc) - timedelta(days=1),
+        )
+        session.add(expired)
+        session.commit()
+
+        deleted = purge_expired_revocations(session)
+        assert deleted == 1
+
+        remaining = session.execute(
+            select(TokenRevocation).where(TokenRevocation.jti == "purge-test-expired")
+        ).scalars().first()
+        assert remaining is None
