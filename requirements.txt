@@ -1,5 +1,5 @@
 # Pinned requirements (runtime + test dependencies, exact versions).
-# All packages are real and imported/used by this project.
+# Generated: 2026-10-07 via pip freeze; update with: pip install -U <pkg> && pip freeze > requirements.txt
 fastapi==0.142.2
 python-multipart==0.0.20
 uvicorn==0.54.0
