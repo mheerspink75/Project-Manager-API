@@ -9,6 +9,8 @@
 
 from __future__ import annotations
 
+from datetime import datetime, timezone
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy import select
@@ -161,7 +163,15 @@ def refresh_tokens(
     if user is None or not user.is_active:
         raise _auth_error("Invalid account")
 
-    db.add(TokenRevocation(jti=jti, user_id=user.id))
+    # Record when the refresh token expires so the revocation row can be
+    # purged once it is no longer needed (see purge_expired_revocations).
+    db.add(
+        TokenRevocation(
+            jti=jti,
+            user_id=user.id,
+            expires_at=datetime.fromtimestamp(claims["exp"], tz=timezone.utc),
+        )
+    )
     db.commit()
 
     return TokenPair(
@@ -186,11 +196,27 @@ def logout(
     jti = str(claims.get("jti", ""))
     user_id = int(claims["sub"])
 
+    # Reject cross-user refresh tokens: presenting another user's token must
+    # not silently succeed (403) or be revoked on their behalf.
+    if user_id != user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Refresh token does not belong to the authenticated user",
+        )
+
     existing = (
         db.execute(select(TokenRevocation).where(TokenRevocation.jti == jti))
         .scalars()
         .first()
     )
     if existing is None and user_id == user.id:
-        db.add(TokenRevocation(jti=jti, user_id=user.id))
+        # Record when the refresh token expires so the revocation row can be
+        # purged once it is no longer needed (see purge_expired_revocations).
+        db.add(
+            TokenRevocation(
+                jti=jti,
+                user_id=user.id,
+                expires_at=datetime.fromtimestamp(claims["exp"], tz=timezone.utc),
+            )
+        )
         db.commit()
