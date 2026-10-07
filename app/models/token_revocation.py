@@ -21,3 +21,8 @@ class TokenRevocation(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
+    # When the underlying refresh token expires; the revocation row is safe to
+    # delete after this point (see purge_expired_revocations).
+    expires_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, index=True
+    )
