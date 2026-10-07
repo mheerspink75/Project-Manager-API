@@ -10,10 +10,12 @@ from __future__ import annotations
 import json
 from typing import Any
 
-from sqlalchemy import select
+from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
 
+from app.core.pagination import paginate
 from app.models.audit_log import AuditLog
+from app.models.token_revocation import TokenRevocation
 from app.models.user import User
 
 # Keys (lower-cased) that must never be serialized into the audit detail.
@@ -81,17 +83,26 @@ def list_audit_entries(
     db: Session, *, limit: int, offset: int
 ) -> tuple[list[AuditLog], int]:
     """Return a page of audit entries (newest first) plus the total count."""
-    from sqlalchemy import func
-
-    total = db.scalar(select(func.count(AuditLog.id))) or 0
-    rows = (
-        db.execute(
-            select(AuditLog)
-            .order_by(AuditLog.created_at.desc(), AuditLog.id.desc())
-            .limit(limit)
-            .offset(offset)
-        )
-        .scalars()
-        .all()
+    # Delegate limit/offset + total-count to the shared pagination helper so
+    # the page-size rules stay consistent with every other list endpoint.
+    stmt = (
+        select(AuditLog)
+        .order_by(AuditLog.created_at.desc(), AuditLog.id.desc())
     )
-    return list(rows), int(total)
+    items, total = paginate(db, stmt, limit=limit, offset=offset)
+    return list(items), total
+
+
+def purge_expired_revocations(db: Session) -> int:
+    """Delete token revocation rows whose refresh token has already expired.
+
+    A revocation row is only needed while the underlying refresh token could
+    still be presented; once ``expires_at`` has passed the row is dead weight.
+    Intended to be called by a cron job or a startup hook (NOT from a request
+    path). Returns the number of rows deleted.
+    """
+    result = db.execute(
+        delete(TokenRevocation).where(TokenRevocation.expires_at < func.now())
+    )
+    db.commit()
+    return result.rowcount or 0
